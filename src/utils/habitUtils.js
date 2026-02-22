@@ -1,0 +1,203 @@
+import { supabase } from '../supabaseClient';
+
+export const THEME_KEY = 'streakflow_theme';
+
+// ─── Helpers ────────────────────────────────────────────────────────────────
+export const getTodayStr = () => new Date().toISOString().split('T')[0];
+
+export const getYesterdayStr = () => {
+  const yesterday = new Date();
+  yesterday.setDate(yesterday.getDate() - 1);
+  return yesterday.toISOString().split('T')[0];
+};
+
+export const isCompletedToday = (lastCompletedDate) =>
+  lastCompletedDate === getTodayStr();
+
+export const calculateNewStreak = (lastCompletedDate, currentStreak) => {
+  const today = getTodayStr();
+  const yesterday = getYesterdayStr();
+  if (lastCompletedDate === today) return currentStreak;
+  if (lastCompletedDate === yesterday) return currentStreak + 1;
+  return 1;
+};
+
+// ─── Map Supabase row → App habit object ────────────────────────────────────
+const toAppHabit = (row, history = []) => ({
+  id: row.id,
+  name: row.name,
+  category: row.category || '',
+  timeLimit: row.time_limit || 15,
+  currentStreak: row.current_streak || 0,
+  lastCompletedDate: row.last_completed_date || null,
+  createdAt: row.created_at,
+  history,
+});
+
+// ─── Habits ─────────────────────────────────────────────────────────────────
+export const loadHabits = async (userId) => {
+  const { data: habits, error } = await supabase
+    .from('habits')
+    .select('*')
+    .eq('user_id', userId)
+    .order('created_at', { ascending: true });
+
+  if (error) { console.error('loadHabits:', error); return []; }
+  if (!habits || habits.length === 0) return [];
+
+  // Fetch completion history for all habits
+  const habitIds = habits.map(h => h.id);
+  const { data: completions } = await supabase
+    .from('habit_completions')
+    .select('habit_id, completed_date')
+    .in('habit_id', habitIds);
+
+  const historyMap = {};
+  (completions || []).forEach(c => {
+    if (!historyMap[c.habit_id]) historyMap[c.habit_id] = [];
+    historyMap[c.habit_id].push(c.completed_date);
+  });
+
+  return habits.map(h => toAppHabit(h, historyMap[h.id] || []));
+};
+
+export const saveHabit = async (userId, habit) => {
+  const row = {
+    user_id: userId,
+    name: habit.name,
+    category: habit.category || '',
+    time_limit: habit.timeLimit || 15,
+    current_streak: habit.currentStreak || 0,
+    last_completed_date: habit.lastCompletedDate || null,
+  };
+
+  if (habit.id) {
+    // Update existing
+    const { data, error } = await supabase
+      .from('habits')
+      .update(row)
+      .eq('id', habit.id)
+      .select()
+      .single();
+    if (error) { console.error('saveHabit update:', error); return null; }
+    return toAppHabit(data, habit.history || []);
+  } else {
+    // Insert new
+    const { data, error } = await supabase
+      .from('habits')
+      .insert({ ...row, created_at: new Date().toISOString() })
+      .select()
+      .single();
+    if (error) { console.error('saveHabit insert:', error); return null; }
+    return toAppHabit(data, []);
+  }
+};
+
+export const deleteHabit = async (habitId) => {
+  const { error } = await supabase.from('habits').delete().eq('id', habitId);
+  if (error) console.error('deleteHabit:', error);
+};
+
+export const completeHabitInDB = async (userId, habit) => {
+  const today = getTodayStr();
+
+  // Upsert completion record
+  await supabase.from('habit_completions').upsert({
+    habit_id: habit.id,
+    user_id: userId,
+    completed_date: today,
+  }, { onConflict: 'habit_id,completed_date', ignoreDuplicates: true });
+
+  const newStreak = calculateNewStreak(habit.lastCompletedDate, habit.currentStreak);
+
+  // Update habit's streak
+  const { data, error } = await supabase
+    .from('habits')
+    .update({ current_streak: newStreak, last_completed_date: today })
+    .eq('id', habit.id)
+    .select()
+    .single();
+
+  if (error) { console.error('completeHabitInDB:', error); return habit; }
+
+  const history = [...(habit.history || []).filter(d => d !== today), today];
+  return toAppHabit(data, history);
+};
+
+// ─── Profile ─────────────────────────────────────────────────────────────────
+export const loadProfile = async (userId) => {
+  const { data, error } = await supabase
+    .from('profiles')
+    .select('*')
+    .eq('id', userId)
+    .single();
+
+  if (error || !data) return { name: 'Friend', age: '', occupation: '' };
+  return { name: data.name || 'Friend', age: data.age || '', occupation: data.occupation || '' };
+};
+
+export const saveProfile = async (userId, profile) => {
+  const { error } = await supabase
+    .from('profiles')
+    .upsert({ id: userId, ...profile, updated_at: new Date().toISOString() });
+  if (error) console.error('saveProfile:', error);
+};
+
+// ─── Process habits on load (reset broken streaks) ──────────────────────────
+export const processHabitsOnLoad = (habits) => {
+  const yesterday = getYesterdayStr();
+  const today = getTodayStr();
+  return habits.map(habit => {
+    if (
+      habit.lastCompletedDate &&
+      habit.lastCompletedDate !== today &&
+      habit.lastCompletedDate !== yesterday
+    ) {
+      return { ...habit, currentStreak: 0 };
+    }
+    return habit;
+  });
+};
+
+// ─── Analytics ───────────────────────────────────────────────────────────────
+export const getStats = (habits, period = 'weekly') => {
+  const today = new Date();
+  let daysToLookBack = 7;
+  if (period === 'monthly') daysToLookBack = 30;
+  if (period === 'yearly') daysToLookBack = 365;
+
+  const thresholdDate = new Date();
+  thresholdDate.setDate(today.getDate() - daysToLookBack);
+  const thresholdStr = thresholdDate.toISOString().split('T')[0];
+
+  let totalPossible = 0;
+  let totalDone = 0;
+
+  habits.forEach(habit => {
+    const completionsInPeriod = (habit.history || []).filter(d => d >= thresholdStr).length;
+    totalDone += completionsInPeriod;
+    const creationDate = new Date(habit.createdAt);
+    const startDate = creationDate > thresholdDate ? creationDate : thresholdDate;
+    const diffTime = Math.abs(today - startDate);
+    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+    totalPossible += diffDays;
+  });
+
+  return {
+    completed: totalDone,
+    possible: totalPossible,
+    rate: totalPossible > 0 ? Math.round((totalDone / totalPossible) * 100) : 0,
+  };
+};
+
+// ─── Quotes ──────────────────────────────────────────────────────────────────
+export const MOTIVATIONAL_QUOTES = [
+  "Consistency is what transforms average into excellence.",
+  "Your future is created by what you do today, not tomorrow.",
+  "Don't stop when you're tired. Stop when you're done.",
+  "Small daily improvements over time lead to stunning results.",
+  "Success is the sum of small efforts, repeated day in and day out.",
+  "Discipline is choosing between what you want now and what you want most.",
+  "The secret of your future is hidden in your daily routine.",
+  "You don't have to be great to start, but you have to start to be great.",
+];
