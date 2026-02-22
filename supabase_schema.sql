@@ -119,15 +119,17 @@ CREATE POLICY "Users can delete own completions"
 -- ─────────────────────────────────────────────
 -- 5. AUTO-CREATE PROFILE on Sign Up
 -- ─────────────────────────────────────────────
-CREATE OR REPLACE FUNCTION handle_new_user()
+CREATE OR REPLACE FUNCTION public.handle_new_user()
 RETURNS TRIGGER AS $$
 BEGIN
-  INSERT INTO profiles (id, name)
+  INSERT INTO public.profiles (id, name)
   VALUES (NEW.id, COALESCE(NEW.raw_user_meta_data->>'name', 'Friend'));
   RETURN NEW;
 END;
-$$ LANGUAGE plpgsql SECURITY DEFINER;
+$$ LANGUAGE plpgsql SECURITY DEFINER SET search_path = public;
 
+-- Drop trigger if it exists and recreate
+DROP TRIGGER IF EXISTS on_auth_user_created ON auth.users;
 CREATE TRIGGER on_auth_user_created
   AFTER INSERT ON auth.users
-  FOR EACH ROW EXECUTE FUNCTION handle_new_user();
+  FOR EACH ROW EXECUTE FUNCTION public.handle_new_user();

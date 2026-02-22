@@ -37,6 +37,7 @@ import {
   MOTIVATIONAL_QUOTES
 } from './utils/habitUtils';
 import { supabase } from './supabaseClient';
+import AuthPage from './AuthPage';
 import './index.css';
 
 // --- Sub-components ---
@@ -515,6 +516,20 @@ export default function App() {
   const completedTodayCount = habits.filter(h => isCompletedToday(h.lastCompletedDate)).length;
   const completionRate = totalHabits > 0 ? Math.round((completedTodayCount / totalHabits) * 100) : 0;
   const currentStats = getStats(habits, statsPeriod);
+
+  if (loading) {
+    return (
+      <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--bg-main)' }}>
+        <div className="auth-logo-icon" style={{ width: '64px', height: '64px' }}>
+          <Flame size={32} strokeWidth={2.5} fill="#ffffff" color="#ffffff" className="auth-spinner" />
+        </div>
+      </div>
+    );
+  }
+
+  if (!user) {
+    return <AuthPage />;
+  }
 
   return (
     <div className="app-container">
