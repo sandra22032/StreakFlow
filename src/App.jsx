@@ -38,6 +38,7 @@ import {
 } from './utils/habitUtils';
 import { supabase } from './supabaseClient';
 import AuthPage from './AuthPage';
+import ChatAssistant from './ChatAssistant';
 import './index.css';
 
 // --- Sub-components ---
@@ -752,7 +753,7 @@ export default function App() {
           </div>
         )
       }
-
+      <ChatAssistant />
     </div >
   );
 }
