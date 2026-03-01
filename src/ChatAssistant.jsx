@@ -23,7 +23,7 @@ const ChatAssistant = ({ habits, profile, externalOpen, onToggle }) => {
     // Initialize Gemini AI
     const genAI = new GoogleGenerativeAI(import.meta.env.VITE_GEMINI_API_KEY);
     const model = genAI.getGenerativeModel({
-        model: "gemini-2.5-flash",
+        model: "gemini-1.5-flash",
         systemInstruction: `You are the StreakFlow AI Assistant. You help users stay motivated and manage their habits.
         The user's name is ${profile.name || 'User'}.
         Current habits: ${habits.length > 0 ? habits.map(h => `- ${h.name} (${h.currentStreak} day streak, category: ${h.category})`).join(', ') : 'No habits created yet.'}.
