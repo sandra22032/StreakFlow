@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { Flame, Mail, Lock, User, ArrowRight, Eye, EyeOff, Loader } from 'lucide-react';
 import { supabase } from './supabaseClient';
 
-const InputField = ({ label, id, type = 'text', icon: Icon, value, onChange, placeholder, extra }) => {
+const InputField = ({ label, id, type = 'text', Icon, value, onChange, placeholder, extra }) => {
     const [showPassword, setShowPassword] = useState(false);
     const isPassword = type === 'password';
 

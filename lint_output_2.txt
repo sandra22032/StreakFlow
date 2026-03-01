@@ -1,0 +1,60 @@
+﻿
+> streakflow@0.0.0 lint
+> eslint .
+
+
+C:\Users\91994\OneDrive\Desktop\Haca\Habit Tracker\src\App.jsx
+  136:7   error    Error: Calling setState synchronously within an effect can trigger cascading renders
+
+Effects are intended to synchronize state between React and external systems such as manually updating the DOM, state management libraries, or other platform APIs. In general, the body of an effect should do one or both of the following:
+* Update external systems with the latest state from React.
+* Subscribe for updates from some external system, calling setState in a callback function when external state changes.
+
+Calling setState synchronously within an effect body causes cascading renders that can hurt performance, and is not recommended. (https://react.dev/learn/you-might-not-need-an-effect).
+
+  134 |   useEffect(() => {
+  135 |     if (editingHabit) {
+> 136 |       setName(editingHabit.name);
+      |       ^^^^^^^ Avoid calling setState() directly within an effect
+  137 |       setCategory(editingHabit.category || '');
+  138 |       setTimeLimit(editingHabit.timeLimit || 15);
+  139 |     } else {                                                                                                                                                         react-hooks/set-state-in-effect
+  362:5   error    Error: Calling setState synchronously within an effect can trigger cascading renders
+
+Effects are intended to synchronize state between React and external systems such as manually updating the DOM, state management libraries, or other platform APIs. In general, the body of an effect should do one or both of the following:
+* Update external systems with the latest state from React.
+* Subscribe for updates from some external system, calling setState in a callback function when external state changes.
+
+Calling setState synchronously within an effect body causes cascading renders that can hurt performance, and is not recommended. (https://react.dev/learn/you-might-not-need-an-effect).
+
+  360 |
+  361 |   useEffect(() => {
+> 362 |     setFormData(profile);
+      |     ^^^^^^^^^^^ Avoid calling setState() directly within an effect
+  363 |   }, [profile, isOpen]);
+  364 |
+  365 |   if (!isOpen) return null;                                                                                                                                                                                                                                                 react-hooks/set-state-in-effect
+  470:15  error    'wasCompletedToday' is assigned a value but never used. Allowed unused vars must match /^[A-Z_]/u                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                no-unused-vars
+  489:5   error    Error: Calling setState synchronously within an effect can trigger cascading renders
+
+Effects are intended to synchronize state between React and external systems such as manually updating the DOM, state management libraries, or other platform APIs. In general, the body of an effect should do one or both of the following:
+* Update external systems with the latest state from React.
+* Subscribe for updates from some external system, calling setState in a callback function when external state changes.
+
+Calling setState synchronously within an effect body causes cascading renders that can hurt performance, and is not recommended. (https://react.dev/learn/you-might-not-need-an-effect).
+
+  487 |
+  488 |     const initialQuote = MOTIVATIONAL_QUOTES[Math.floor(Math.random() * MOTIVATIONAL_QUOTES.length)];
+> 489 |     setQuote(initialQuote);
+      |     ^^^^^^^^ Avoid calling setState() directly within an effect
+  490 |     const hideTimeout = setTimeout(() => setQuote(''), 7000);
+  491 |     const quoteInterval = setInterval(() => {
+  492 |       const randomQuote = MOTIVATIONAL_QUOTES[Math.floor(Math.random() * MOTIVATIONAL_QUOTES.length)];  react-hooks/set-state-in-effect
+  497:6   warning  React Hook useEffect has a missing dependency: 'theme'. Either include it or remove the dependency array                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         react-hooks/exhaustive-deps
+  544:41  error    'statsPeriod' is not defined                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     no-undef
+
+C:\Users\91994\OneDrive\Desktop\Haca\Habit Tracker\src\AuthPage.jsx
+  5:49  error  'Icon' is defined but never used  no-unused-vars
+
+Γ£û 7 problems (6 errors, 1 warning)
+

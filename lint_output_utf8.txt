@@ -1,0 +1,64 @@
+﻿
+> streakflow@0.0.0 lint
+> eslint .
+
+
+C:\Users\91994\OneDrive\Desktop\Haca\Habit Tracker\src\App.jsx
+    1:38  error    'useCallback' is defined but never used. Allowed unused vars must match /^[A-Z_]/u                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               no-unused-vars
+   34:3   error    'getTodayStr' is defined but never used. Allowed unused vars must match /^[A-Z_]/u                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               no-unused-vars
+   35:3   error    'calculateNewStreak' is defined but never used. Allowed unused vars must match /^[A-Z_]/u                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        no-unused-vars
+  138:7   error    Error: Calling setState synchronously within an effect can trigger cascading renders
+
+Effects are intended to synchronize state between React and external systems such as manually updating the DOM, state management libraries, or other platform APIs. In general, the body of an effect should do one or both of the following:
+* Update external systems with the latest state from React.
+* Subscribe for updates from some external system, calling setState in a callback function when external state changes.
+
+Calling setState synchronously within an effect body causes cascading renders that can hurt performance, and is not recommended. (https://react.dev/learn/you-might-not-need-an-effect).
+
+  136 |   useEffect(() => {
+  137 |     if (editingHabit) {
+> 138 |       setName(editingHabit.name);
+      |       ^^^^^^^ Avoid calling setState() directly within an effect
+  139 |       setCategory(editingHabit.category || '');
+  140 |       setTimeLimit(editingHabit.timeLimit || 15);
+  141 |     } else {                                                                                                                                                         react-hooks/set-state-in-effect
+  364:5   error    Error: Calling setState synchronously within an effect can trigger cascading renders
+
+Effects are intended to synchronize state between React and external systems such as manually updating the DOM, state management libraries, or other platform APIs. In general, the body of an effect should do one or both of the following:
+* Update external systems with the latest state from React.
+* Subscribe for updates from some external system, calling setState in a callback function when external state changes.
+
+Calling setState synchronously within an effect body causes cascading renders that can hurt performance, and is not recommended. (https://react.dev/learn/you-might-not-need-an-effect).
+
+  362 |
+  363 |   useEffect(() => {
+> 364 |     setFormData(profile);
+      |     ^^^^^^^^^^^ Avoid calling setState() directly within an effect
+  365 |   }, [profile, isOpen]);
+  366 |
+  367 |   if (!isOpen) return null;                                                                                                                                                                                                                                                 react-hooks/set-state-in-effect
+  423:23  error    'setStatsPeriod' is assigned a value but never used. Allowed unused vars must match /^[A-Z_]/u                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   no-unused-vars
+  473:15  error    'wasCompletedToday' is assigned a value but never used. Allowed unused vars must match /^[A-Z_]/u                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                no-unused-vars
+  492:5   error    Error: Calling setState synchronously within an effect can trigger cascading renders
+
+Effects are intended to synchronize state between React and external systems such as manually updating the DOM, state management libraries, or other platform APIs. In general, the body of an effect should do one or both of the following:
+* Update external systems with the latest state from React.
+* Subscribe for updates from some external system, calling setState in a callback function when external state changes.
+
+Calling setState synchronously within an effect body causes cascading renders that can hurt performance, and is not recommended. (https://react.dev/learn/you-might-not-need-an-effect).
+
+  490 |
+  491 |     const initialQuote = MOTIVATIONAL_QUOTES[Math.floor(Math.random() * MOTIVATIONAL_QUOTES.length)];
+> 492 |     setQuote(initialQuote);
+      |     ^^^^^^^^ Avoid calling setState() directly within an effect
+  493 |     const hideTimeout = setTimeout(() => setQuote(''), 7000);
+  494 |     const quoteInterval = setInterval(() => {
+  495 |       const randomQuote = MOTIVATIONAL_QUOTES[Math.floor(Math.random() * MOTIVATIONAL_QUOTES.length)];  react-hooks/set-state-in-effect
+  500:6   warning  React Hook useEffect has a missing dependency: 'theme'. Either include it or remove the dependency array                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         react-hooks/exhaustive-deps
+  543:9   error    'scrollToSection' is assigned a value but never used. Allowed unused vars must match /^[A-Z_]/u                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  no-unused-vars
+
+C:\Users\91994\OneDrive\Desktop\Haca\Habit Tracker\src\AuthPage.jsx
+  5:55  error  'Icon' is defined but never used  no-unused-vars
+
+Γ£û 11 problems (10 errors, 1 warning)
+

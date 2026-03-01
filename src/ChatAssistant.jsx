@@ -1,9 +1,13 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { MessageCircle, Send, X, Bot, Sparkles, User, Loader2, MinusCircle, Maximize2 } from 'lucide-react';
+import { GoogleGenerativeAI } from "@google/generative-ai";
 
-const ChatAssistant = () => {
-    const [isOpen, setIsOpen] = useState(false);
+const ChatAssistant = ({ habits, profile, externalOpen, onToggle }) => {
+    const [internalOpen, setInternalOpen] = useState(false);
     const [isMinimized, setIsMinimized] = useState(false);
+
+    const isOpen = externalOpen !== undefined ? externalOpen : internalOpen;
+    const setIsOpen = onToggle || setInternalOpen;
     const [input, setInput] = useState('');
     const [messages, setMessages] = useState([
         {
@@ -16,6 +20,16 @@ const ChatAssistant = () => {
     const [isTyping, setIsTyping] = useState(false);
     const scrollRef = useRef(null);
 
+    // Initialize Gemini AI
+    const genAI = new GoogleGenerativeAI(import.meta.env.VITE_GEMINI_API_KEY);
+    const model = genAI.getGenerativeModel({
+        model: "gemini-2.5-flash",
+        systemInstruction: `You are the StreakFlow AI Assistant. You help users stay motivated and manage their habits.
+        The user's name is ${profile.name || 'User'}.
+        Current habits: ${habits.length > 0 ? habits.map(h => `- ${h.name} (${h.currentStreak} day streak, category: ${h.category})`).join(', ') : 'No habits created yet.'}.
+        Be encouraging, concise, and professional. Use the user's data to give personalized advice.`
+    });
+
     useEffect(() => {
         if (scrollRef.current) {
             scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
@@ -24,12 +38,13 @@ const ChatAssistant = () => {
 
     const handleSend = async (e) => {
         e.preventDefault();
-        if (!input.trim()) return;
+        const userInput = input.trim();
+        if (!userInput) return;
 
         const userMsg = {
             id: Date.now(),
             role: 'user',
-            content: input,
+            content: userInput,
             timestamp: new Date()
         };
 
@@ -37,31 +52,40 @@ const ChatAssistant = () => {
         setInput('');
         setIsTyping(true);
 
-        // Simulate AI Response
-        setTimeout(() => {
+        try {
+            // Gemini history MUST NOT start with a 'model' (assistant) role.
+            // We filter out our initial greeting to comply with the API.
+            const history = messages
+                .filter(msg => msg.id !== 1) // Remove initial assistant greeting
+                .map(msg => ({
+                    role: msg.role === 'assistant' ? 'model' : 'user',
+                    parts: [{ text: msg.content }],
+                }));
+
+            const chatSession = model.startChat({ history });
+
+            const result = await chatSession.sendMessage(userInput);
+            const responseText = result.response.text();
+
             const aiMsg = {
                 id: Date.now() + 1,
                 role: 'assistant',
-                content: generateMockResponse(input),
+                content: responseText,
                 timestamp: new Date()
             };
             setMessages(prev => [...prev, aiMsg]);
+        } catch (error) {
+            console.error("Gemini AI Error:", error);
+            const errorMsg = {
+                id: Date.now() + 1,
+                role: 'assistant',
+                content: "I'm having trouble connecting to my brain right now. Please check your API key or try again in a moment! 🧠💤",
+                timestamp: new Date()
+            };
+            setMessages(prev => [...prev, errorMsg]);
+        } finally {
             setIsTyping(false);
-        }, 1500);
-    };
-
-    const generateMockResponse = (text) => {
-        const lowerText = text.toLowerCase();
-        if (lowerText.includes('streak')) {
-            return "Building a streak is all about 'Atomic Habits'. Start so small it's impossible to fail. If you want to run a marathon, start by putting on your running shoes every day.";
         }
-        if (lowerText.includes('health')) {
-            return "Health streaks are powerful! Try tracking 'Drink 2L water' or '10 min stretching'. Consistency in health leads to massive energy gains.";
-        }
-        if (lowerText.includes('lazy') || lowerText.includes('tired')) {
-            return "It's okay to have low-energy days. Don't break the chain! Do a 'Micro Version' of your habit. Instead of a 1-hour workout, do just 5 pushups.";
-        }
-        return "That's a great goal! Remember, consistency beats intensity every time. Keep flowing with StreakFlow! Is there anything specific about your habits you'd like to optimize?";
     };
 
     const toggleChat = () => {

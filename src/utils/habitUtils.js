@@ -168,6 +168,8 @@ export const getStats = (habits, period = 'weekly') => {
 
   const thresholdDate = new Date();
   thresholdDate.setDate(today.getDate() - daysToLookBack);
+  // Set to start of day for accurate comparison
+  thresholdDate.setHours(0, 0, 0, 0);
   const thresholdStr = thresholdDate.toISOString().split('T')[0];
 
   let totalPossible = 0;
@@ -176,15 +178,33 @@ export const getStats = (habits, period = 'weekly') => {
   habits.forEach(habit => {
     const completionsInPeriod = (habit.history || []).filter(d => d >= thresholdStr).length;
     totalDone += completionsInPeriod;
+
+    // Calculate possible days since creation or threshold
     const creationDate = new Date(habit.createdAt);
+    creationDate.setHours(0, 0, 0, 0);
+
     const startDate = creationDate > thresholdDate ? creationDate : thresholdDate;
-    const diffTime = Math.abs(today - startDate);
-    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-    totalPossible += diffDays;
+
+    // Calculate days between startDate and "yesterday" (since today isn't failed yet)
+    // Or between startDate and today if we want to include today's possibility
+    const endDate = new Date();
+    endDate.setHours(0, 0, 0, 0);
+
+    const diffTime = endDate - startDate;
+    const diffDays = Math.max(0, Math.floor(diffTime / (1000 * 60 * 60 * 24)));
+
+    // If it's completed today, we count today as a possible day
+    const isDoneToday = isCompletedToday(habit.lastCompletedDate);
+    const possibleForHabit = diffDays + (isDoneToday ? 1 : 0);
+
+    totalPossible += possibleForHabit;
   });
+
+  const failedCount = Math.max(0, totalPossible - totalDone);
 
   return {
     completed: totalDone,
+    failed: failedCount,
     possible: totalPossible,
     rate: totalPossible > 0 ? Math.round((totalDone / totalPossible) * 100) : 0,
   };

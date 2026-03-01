@@ -972,19 +972,7 @@ h6 {
 
 @media (max-width: 640px) {
   .wheel-toggle-btn {
-    top: auto;
-    bottom: 8rem;
-    /* Positioned above the motivational quote */
-    right: 1.5rem;
-    transform: none;
-    width: 58px;
-    height: 58px;
-    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3);
-  }
-
-  .wheel-toggle-btn .wheel-tooltip {
-    display: none;
-    /* Hide tooltip on mobile to save space */
+    display: none !important;
   }
 
   .analytics-page {
@@ -1443,7 +1431,7 @@ h6 {
 .chat-toggle-btn {
   position: fixed;
   bottom: 2rem;
-  right: 2rem;
+  left: 2rem;
   width: 60px;
   height: 60px;
   border-radius: 50%;
@@ -1505,7 +1493,7 @@ h6 {
 .chat-window {
   position: fixed;
   bottom: 2rem;
-  right: 2rem;
+  left: 2rem;
   width: 380px;
   height: 550px;
   background: rgba(255, 255, 255, 0.85);
@@ -1517,7 +1505,7 @@ h6 {
   flex-direction: column;
   overflow: hidden;
   z-index: 2001;
-  transform-origin: bottom right;
+  transform-origin: bottom left;
 }
 
 [data-theme='dark'] .chat-window {
@@ -1800,19 +1788,68 @@ h6 {
   }
 }
 
+/* Notifications & Alerts */
+.alert-box {
+  background: rgba(239, 68, 68, 0.1);
+  border: 1px solid rgba(239, 68, 68, 0.2);
+  border-radius: 1rem;
+  padding: 1rem 1.25rem;
+  margin-bottom: 2rem;
+  color: var(--text-main);
+  position: relative;
+  overflow: hidden;
+}
+
+.alert-icon-warn {
+  background: #EF4444;
+  color: white;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.animate-slide-in {
+  animation: slideIn 0.4s ease-out;
+}
+
+@keyframes slideIn {
+  from {
+    transform: translateY(-20px);
+    opacity: 0;
+  }
+
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+
 @media (max-width: 640px) {
   .chat-toggle-btn {
-    bottom: 1.5rem;
-    right: 1.5rem;
-    width: 54px;
-    height: 54px;
+    display: none !important;
   }
 
   .chat-window {
     bottom: 1rem;
-    right: 1rem;
+    left: 1rem;
     width: calc(100vw - 2rem);
     height: 60vh;
     max-height: 500px;
+  }
+}
+
+/* Responsive Utilities */
+.mobile-only {
+  display: flex !important;
+}
+
+@media (min-width: 641px) {
+  .mobile-only {
+    display: none !important;
   }
 }

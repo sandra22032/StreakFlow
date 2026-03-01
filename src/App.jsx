@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Flame,
   CheckCircle2,
@@ -20,7 +20,9 @@ import {
   ChevronDown,
   Menu,
   LogOut,
-  ArrowLeft
+  ArrowLeft,
+  Sparkles,
+  Dices
 } from 'lucide-react';
 import {
   loadHabits,
@@ -29,8 +31,6 @@ import {
   completeHabitInDB,
   loadProfile,
   saveProfile,
-  getTodayStr,
-  calculateNewStreak,
   isCompletedToday,
   processHabitsOnLoad,
   getStats,
@@ -226,10 +226,12 @@ const HabitModal = ({ isOpen, onClose, onSave, editingHabit }) => {
   );
 };
 
-const RandomTaskWheel = ({ habits, onAddHabit }) => {
+const RandomTaskWheel = ({ habits, onAddHabit, externalOpen, onOpenChange }) => {
   const [spinning, setSpinning] = useState(false);
   const [result, setResult] = useState(null);
-  const [showModal, setShowModal] = useState(false);
+
+  const showModal = externalOpen !== undefined ? externalOpen : false;
+  const setShowModal = onOpenChange;
   const [added, setAdded] = useState(false);
 
   const defaultTasks = [
@@ -416,7 +418,6 @@ export default function App() {
   const [habits, setHabits] = useState([]);
   const [profile, setProfile] = useState({ name: 'User', age: '', occupation: '' });
   const [theme, setTheme] = useState(localStorage.getItem('streakflow_theme') || 'light');
-  const [statsPeriod, setStatsPeriod] = useState('weekly');
   const [quote, setQuote] = useState('');
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -426,6 +427,9 @@ export default function App() {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [editingHabit, setEditingHabit] = useState(null);
   const [currentView, setCurrentView] = useState('home');
+  const [notification, setNotification] = useState(null);
+  const [isChatOpen, setIsChatOpen] = useState(false);
+  const [isWheelOpen, setIsWheelOpen] = useState(false);
 
   // Auth state listener
   useEffect(() => {
@@ -447,8 +451,35 @@ export default function App() {
         loadHabits(user.id),
         loadProfile(user.id),
       ]);
-      setHabits(processHabitsOnLoad(loadedHabits));
+      const processed = processHabitsOnLoad(loadedHabits);
+      setHabits(processed);
       setProfile(loadedProfile);
+
+      // Check for missed habits yesterday
+      const yesterday = new Date();
+      yesterday.setDate(yesterday.getDate() - 1);
+      const yesterdayStr = yesterday.toISOString().split('T')[0];
+
+      const missedYesterday = processed.filter(habit => {
+        // Habit existed yesterday
+        const createdDate = new Date(habit.createdAt).toISOString().split('T')[0];
+        if (createdDate > yesterdayStr) return false;
+
+        // Was not completed yesterday or today
+        const wasCompletedYesterday = habit.history?.includes(yesterdayStr);
+
+        // We only notify if it was missed *yesterday* 
+        // to avoid notifying about *today* which isn't over yet.
+        return !wasCompletedYesterday;
+      });
+
+      if (missedYesterday.length > 0) {
+        setNotification({
+          type: 'warning',
+          message: `Notice: ${missedYesterday.length} task${missedYesterday.length > 1 ? 's' : ''} were not completed yesterday and have been marked as incomplete.`,
+          count: missedYesterday.length
+        });
+      }
     };
     initialize();
     document.documentElement.setAttribute('data-theme', theme);
@@ -505,18 +536,11 @@ export default function App() {
     }
   };
 
-  const scrollToSection = (id) => {
-    const element = document.getElementById(id);
-    if (element) {
-      element.scrollIntoView({ behavior: 'smooth' });
-    }
-    setIsMenuOpen(false);
-  };
 
   const totalHabits = habits.length;
   const completedTodayCount = habits.filter(h => isCompletedToday(h.lastCompletedDate)).length;
   const completionRate = totalHabits > 0 ? Math.round((completedTodayCount / totalHabits) * 100) : 0;
-  const currentStats = getStats(habits, statsPeriod);
+  const currentStats = getStats(habits, 'weekly');
 
   if (loading) {
     return (
@@ -557,6 +581,20 @@ export default function App() {
             <h1 style={{ fontSize: '2rem' }}>Hello, {profile.name || 'User'} 👋</h1>
             <p style={{ color: 'var(--text-muted)' }}>Ready to win the day?</p>
           </div>
+
+          {notification && (
+            <div className="alert-box animate-slide-in">
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', justifyContent: 'space-between' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                  <div className="alert-icon-warn"><X size={16} /></div>
+                  <p style={{ margin: 0, fontSize: '0.9rem', fontWeight: 600 }}>{notification.message}</p>
+                </div>
+                <button className="btn btn-ghost" onClick={() => setNotification(null)} style={{ padding: '0.25rem', height: 'auto', minWidth: 'auto' }}>
+                  <X size={16} />
+                </button>
+              </div>
+            </div>
+          )}
 
           <div className="stats-grid">
             <StatCard label="Total Habits" value={totalHabits} icon={Target} />
@@ -635,7 +673,12 @@ export default function App() {
             </div>
           )}
 
-          <RandomTaskWheel habits={habits} onAddHabit={handleSaveHabit} />
+          <RandomTaskWheel
+            habits={habits}
+            onAddHabit={handleSaveHabit}
+            externalOpen={isWheelOpen}
+            onOpenChange={setIsWheelOpen}
+          />
         </>
       ) : (
         <div className="analytics-page animate-fade-in">
@@ -656,9 +699,12 @@ export default function App() {
                 <div className="analytics-bar-bg">
                   <div className="analytics-bar-fill" style={{ width: `${getStats(habits, 'weekly').rate}%`, backgroundColor: '#3B82F6' }}></div>
                 </div>
-                <div className="analytics-footer">
-                  <span>{getStats(habits, 'weekly').completed} completed</span>
-                  <span>Last 7 days</span>
+                <div className="analytics-footer" style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                    <span>{getStats(habits, 'weekly').completed} completed</span>
+                    <span style={{ color: '#EF4444' }}>{getStats(habits, 'weekly').failed} missed</span>
+                  </div>
+                  <span style={{ fontSize: '0.75rem', opacity: 0.6 }}>Last 7 days</span>
                 </div>
               </div>
 
@@ -670,9 +716,12 @@ export default function App() {
                 <div className="analytics-bar-bg">
                   <div className="analytics-bar-fill" style={{ width: `${getStats(habits, 'monthly').rate}%`, backgroundColor: '#8B5CF6' }}></div>
                 </div>
-                <div className="analytics-footer">
-                  <span>{getStats(habits, 'monthly').completed} completed</span>
-                  <span>Last 30 days</span>
+                <div className="analytics-footer" style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                    <span>{getStats(habits, 'monthly').completed} completed</span>
+                    <span style={{ color: '#EF4444' }}>{getStats(habits, 'monthly').failed} missed</span>
+                  </div>
+                  <span style={{ fontSize: '0.75rem', opacity: 0.6 }}>Last 30 days</span>
                 </div>
               </div>
             </div>
@@ -681,6 +730,7 @@ export default function App() {
               <h3 style={{ marginBottom: '1.5rem' }}>Detailed Breakdown</h3>
               <div className="stats-grid">
                 <StatCard label="Consistency Score" value={completionRate + "%"} color="var(--primary)" icon={Target} />
+                <StatCard label="Failed/Missed Tasks" value={currentStats.failed} color="#EF4444" icon={X} />
                 <StatCard label="Total Completions" value={habits.reduce((acc, h) => acc + (h.history?.length || 0), 0)} color="#3B82F6" icon={CheckCircle2} />
                 <StatCard label="Active Streaks" value={habits.filter(h => h.currentStreak > 0).length} color="var(--streak)" icon={Flame} />
                 <StatCard label="Historical Peak" value={Math.max(...habits.map(h => h.currentStreak), 0) + "d"} icon={TrendingUp} />
@@ -719,6 +769,22 @@ export default function App() {
               </div>
 
               <div className="menu-content">
+                <button className="menu-item mobile-only" onClick={() => { setIsChatOpen(true); setIsMenuOpen(false); }}>
+                  <div className="menu-item-icon" style={{ background: 'rgba(59, 130, 246, 0.1)' }}>
+                    <Sparkles size={20} color="#3B82F6" />
+                  </div>
+                  <span>AI Focus Assistant</span>
+                </button>
+
+                <button className="menu-item mobile-only" onClick={() => { setIsWheelOpen(true); setIsMenuOpen(false); }}>
+                  <div className="menu-item-icon" style={{ background: 'rgba(139, 92, 246, 0.1)' }}>
+                    <Dices size={20} color="#8B5CF6" />
+                  </div>
+                  <span>The Wheel of Focus</span>
+                </button>
+
+                <div style={{ margin: '0.5rem 0', borderTop: '1px solid var(--border)' }} className="mobile-only"></div>
+
                 <button className="menu-item" onClick={() => { setCurrentView('analytics'); setIsMenuOpen(false); }}>
                   <div className="menu-item-icon" style={{ background: 'rgba(59, 130, 246, 0.1)' }}>
                     <BarChart3 size={20} color="#3B82F6" />
@@ -753,7 +819,12 @@ export default function App() {
           </div>
         )
       }
-      <ChatAssistant />
+      <ChatAssistant
+        habits={habits}
+        profile={profile}
+        externalOpen={isChatOpen}
+        onToggle={setIsChatOpen}
+      />
     </div >
   );
 }
