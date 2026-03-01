@@ -2,7 +2,8 @@ import React, { useState } from 'react';
 import { Flame, Mail, Lock, User, ArrowRight, Eye, EyeOff, Loader } from 'lucide-react';
 import { supabase } from './supabaseClient';
 
-const InputField = ({ label, id, type = 'text', Icon, value, onChange, placeholder, extra }) => {
+const InputField = ({ label, id, type = 'text', icon, value, onChange, placeholder, extra }) => {
+    const IconComponent = icon;
     const [showPassword, setShowPassword] = useState(false);
     const isPassword = type === 'password';
 
@@ -10,7 +11,7 @@ const InputField = ({ label, id, type = 'text', Icon, value, onChange, placehold
         <div className="auth-field">
             <label htmlFor={id} className="auth-label">{label}</label>
             <div className="auth-input-wrap">
-                <Icon size={18} className="auth-input-icon" />
+                {IconComponent && <IconComponent size={18} className="auth-input-icon" />}
                 <input
                     id={id}
                     type={isPassword && showPassword ? 'text' : type}
