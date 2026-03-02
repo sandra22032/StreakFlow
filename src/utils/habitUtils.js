@@ -237,26 +237,35 @@ export const getStats = (habits, period = 'weekly') => {
   let totalDone = 0;
 
   habits.forEach(habit => {
-    const completionsInPeriod = (habit.history || []).filter(d => d >= thresholdStr).length;
+    const history = habit.history || [];
+    const completionsInPeriod = history.filter(d => d >= thresholdStr).length;
     totalDone += completionsInPeriod;
 
-    // Calculate possible days since creation or threshold
-    const creationDate = new Date(habit.createdAt);
+    // Calculate possible days
+    const creationDate = new Date(habit.createdAt || Date.now());
     creationDate.setHours(0, 0, 0, 0);
-
     const startDate = creationDate > thresholdDate ? creationDate : thresholdDate;
 
-    // Calculate days between startDate and "yesterday" (since today isn't failed yet)
-    // Or between startDate and today if we want to include today's possibility
     const endDate = new Date();
     endDate.setHours(0, 0, 0, 0);
 
+    // For active habits, today is a possibility
+    // For archived habits, we stop counting possibility at the relative "now" 
+    // or their last activity if we had that date. 
+    // To be simple: active habits count today, archived habits count until yesterday.
+    let possibleForHabit = 0;
     const diffTime = endDate - startDate;
     const diffDays = Math.max(0, Math.floor(diffTime / (1000 * 60 * 60 * 24)));
 
-    // If it's completed today, we count today as a possible day
-    const isDoneToday = isCompletedToday(habit.lastCompletedDate);
-    const possibleForHabit = diffDays + (isDoneToday ? 1 : 0);
+    if (habit.isActive) {
+      // Include all days up to today
+      possibleForHabit = diffDays + 1;
+    } else {
+      // Archived: only count days until they were missed/archived
+      // Since they are archived the morning AFTER a miss, they were "possible" 
+      // up until the day they were missed (diffDays).
+      possibleForHabit = diffDays;
+    }
 
     totalPossible += possibleForHabit;
   });
