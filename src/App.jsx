@@ -33,6 +33,7 @@ import {
   saveProfile,
   isCompletedToday,
   processHabitsOnLoad,
+  deactivateHabits,
   getStats,
   MOTIVATIONAL_QUOTES
 } from './utils/habitUtils';
@@ -459,28 +460,21 @@ export default function App() {
       setHabits(processed);
       setProfile(loadedProfile);
 
-      // Check for missed habits yesterday
-      const yesterday = new Date();
-      yesterday.setDate(yesterday.getDate() - 1);
-      const yesterdayStr = yesterday.toISOString().split('T')[0];
+      // Sync deactivated habits to DB
+      const newlyDeactivated = processed
+        .filter((h, i) => !h.isActive && loadedHabits[i].isActive)
+        .map(h => h.id);
+      if (newlyDeactivated.length > 0) {
+        await deactivateHabits(user.id, newlyDeactivated);
+      }
 
-      const missedYesterday = processed.filter(habit => {
-        // Habit existed yesterday
-        const createdDate = new Date(habit.createdAt).toISOString().split('T')[0];
-        if (createdDate > yesterdayStr) return false;
-
-        // Was not completed yesterday or today
-        const wasCompletedYesterday = habit.history?.includes(yesterdayStr);
-
-        // We only notify if it was missed *yesterday* 
-        // to avoid notifying about *today* which isn't over yet.
-        return !wasCompletedYesterday;
-      });
+      // Check for missed habits yesterday (already handled by processed.isActive)
+      const missedYesterday = processed.filter((h, i) => !h.isActive && loadedHabits[i].isActive);
 
       if (missedYesterday.length > 0) {
         setNotification({
           type: 'warning',
-          message: `Notice: ${missedYesterday.length} task${missedYesterday.length > 1 ? 's' : ''} were not completed yesterday and have been marked as incomplete.`,
+          message: `Clean Slate: ${missedYesterday.length} incomplete task${missedYesterday.length > 1 ? 's' : ''} from yesterday have been archived to keep your focus fresh.`,
           count: missedYesterday.length
         });
       }
@@ -509,7 +503,10 @@ export default function App() {
   const handleSaveHabit = async (data) => {
     if (!user) return;
     const saved = await saveHabit(user.id, data);
-    if (!saved) return;
+    if (!saved) {
+      alert("Failed to save habit. This is often because the database schema update (is_active column) hasn't been applied yet. Please check the SQL instructions.");
+      return;
+    }
     if (data.id) {
       setHabits(habits.map(h => h.id === saved.id ? saved : h));
     } else {
@@ -637,11 +634,11 @@ export default function App() {
             </div>
           </div>
 
-          {habits.length === 0 ? (
+          {habits.filter(h => h.isActive).length === 0 ? (
             <div style={{ textAlign: 'center', padding: '5rem 2rem', background: 'var(--bg-card)', borderRadius: '1.25rem', border: '2px dashed var(--border)' }}>
               <Target size={40} color="var(--text-muted)" style={{ marginBottom: '1rem' }} />
-              <h3>No habits yet</h3>
-              <p style={{ color: 'var(--text-muted)' }}>Build consistency by tracking your daily routines. Add your first habit to start!</p>
+              <h3>Clean slate for today</h3>
+              <p style={{ color: 'var(--text-muted)' }}>No active tasks yet. Complete yesterday's carry-overs or add new ones!</p>
               <button className="btn btn-primary" onClick={() => setIsHabitModalOpen(true)} style={{ margin: '1.5rem auto 0' }}>
                 <Plus size={18} /> Create Habit
               </button>
@@ -649,7 +646,7 @@ export default function App() {
           ) : (
             <>
               <div className="habit-grid">
-                {habits.map(habit => (
+                {habits.filter(h => h.isActive).map(habit => (
                   <HabitCard
                     key={habit.id}
                     habit={habit}
@@ -736,9 +733,55 @@ export default function App() {
                 <StatCard label="Consistency Score" value={completionRate + "%"} color="var(--primary)" icon={Target} />
                 <StatCard label="Failed/Missed Tasks" value={currentStats.failed} color="#EF4444" icon={X} />
                 <StatCard label="Total Completions" value={habits.reduce((acc, h) => acc + (h.history?.length || 0), 0)} color="#3B82F6" icon={CheckCircle2} />
-                <StatCard label="Active Streaks" value={habits.filter(h => h.currentStreak > 0).length} color="var(--streak)" icon={Flame} />
+                <StatCard label="Active Streaks" value={habits.filter(h => h.isActive && h.currentStreak > 0).length} color="var(--streak)" icon={Flame} />
                 <StatCard label="Historical Peak" value={Math.max(...habits.map(h => h.currentStreak), 0) + "d"} icon={TrendingUp} />
               </div>
+            </div>
+
+            {/* Missed Tasks Record */}
+            <div style={{ marginTop: '4rem' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '1.5rem' }}>
+                <Clock size={20} color="var(--text-muted)" />
+                <h3 style={{ margin: 0 }}>Archived Missed Tasks</h3>
+              </div>
+              <p style={{ color: 'var(--text-muted)', marginBottom: '1.5rem', fontSize: '0.9rem' }}>
+                These tasks were not completed on time and have been removed from your daily focus.
+                They remain here as a record of your journey.
+              </p>
+
+              {habits.filter(h => !h.isActive).length === 0 ? (
+                <div style={{ padding: '2rem', textAlign: 'center', background: 'var(--bg-main)', borderRadius: '1rem', border: '1px solid var(--border)', opacity: 0.6 }}>
+                  No archived tasks yet. Keep it up!
+                </div>
+              ) : (
+                <div className="missed-tasks-list" style={{ display: 'grid', gap: '0.75rem' }}>
+                  {habits.filter(h => !h.isActive).reverse().map(h => (
+                    <div key={h.id} style={{
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      alignItems: 'center',
+                      padding: '1rem 1.5rem',
+                      background: 'var(--bg-main)',
+                      borderRadius: '1rem',
+                      border: '1px solid var(--border)'
+                    }}>
+                      <div>
+                        <div style={{ fontWeight: 600, color: 'var(--text-main)' }}>{h.name}</div>
+                        <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
+                          {h.category} • Ended on streak of {h.currentStreak}
+                        </div>
+                      </div>
+                      <button
+                        className="btn btn-ghost"
+                        style={{ fontSize: '0.8rem', color: 'var(--primary)', fontWeight: 600 }}
+                        onClick={() => handleSaveHabit({ ...h, isActive: true })}
+                      >
+                        Re-activate
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           </div>
         </div>

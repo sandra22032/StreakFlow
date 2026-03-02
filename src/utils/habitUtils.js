@@ -31,6 +31,7 @@ const toAppHabit = (row, history = []) => ({
   currentStreak: row.current_streak || 0,
   lastCompletedDate: row.last_completed_date || null,
   createdAt: row.created_at,
+  isActive: row.is_active !== false, // Treat true and null as active
   history,
 });
 
@@ -69,6 +70,7 @@ export const saveHabit = async (userId, habit) => {
     time_limit: habit.timeLimit || 15,
     current_streak: habit.currentStreak || 0,
     last_completed_date: habit.lastCompletedDate || null,
+    is_active: habit.isActive !== undefined ? habit.isActive : true,
   };
 
   if (habit.id) {
@@ -79,7 +81,21 @@ export const saveHabit = async (userId, habit) => {
       .eq('id', habit.id)
       .select()
       .single();
-    if (error) { console.error('saveHabit update:', error); return null; }
+    if (error) {
+      console.error('saveHabit update:', error);
+      if (error.code === '42703') {
+        const { is_active, ...rowWithoutActive } = row;
+        const { data: fallbackData, error: fallbackError } = await supabase
+          .from('habits')
+          .update(rowWithoutActive)
+          .eq('id', habit.id)
+          .select()
+          .single();
+        if (fallbackError) return null;
+        return toAppHabit(fallbackData, habit.history || []);
+      }
+      return null;
+    }
     return toAppHabit(data, habit.history || []);
   } else {
     // Insert new
@@ -88,7 +104,25 @@ export const saveHabit = async (userId, habit) => {
       .insert({ ...row, created_at: new Date().toISOString() })
       .select()
       .single();
-    if (error) { console.error('saveHabit insert:', error); return null; }
+
+    if (error) {
+      console.error('saveHabit insert:', error);
+      // If the error is that the column doesn't exist, try saving without it
+      if (error.code === '42703') {
+        const { is_active, ...rowWithoutActive } = row;
+        const { data: fallbackData, error: fallbackError } = await supabase
+          .from('habits')
+          .insert({ ...rowWithoutActive, created_at: new Date().toISOString() })
+          .select()
+          .single();
+        if (fallbackError) {
+          console.error('saveHabit fallback insert failed:', fallbackError);
+          return null;
+        }
+        return toAppHabit(fallbackData, []);
+      }
+      return null;
+    }
     return toAppHabit(data, []);
   }
 };
@@ -143,11 +177,27 @@ export const saveProfile = async (userId, profile) => {
   if (error) console.error('saveProfile:', error);
 };
 
-// ─── Process habits on load (reset broken streaks) ──────────────────────────
+// ─── Process habits on load (deactivate missed and reset streaks) ──────────
 export const processHabitsOnLoad = (habits) => {
   const yesterday = getYesterdayStr();
   const today = getTodayStr();
+
   return habits.map(habit => {
+    // 1. Identify if it was missed yesterday
+    // If it was created before today and last completed before yesterday (or never)
+    const creationDate = habit.createdAt ? habit.createdAt.split('T')[0] : today;
+    const wasCreatedBeforeToday = creationDate < today;
+    const wasNotCompletedYesterday = !habit.history?.includes(yesterday);
+    const wasNotCompletedToday = !habit.history?.includes(today);
+
+    // If it's currently active and was missed yesterday, deactivate it
+    if (habit.isActive && wasCreatedBeforeToday && wasNotCompletedYesterday && wasNotCompletedToday) {
+      return { ...habit, isActive: false, currentStreak: 0 };
+    }
+
+    // 2. Legacy streak reset (for habits that stay active but skipped a day)
+    // Actually, with the new rule, habits that skip a day are deactivated.
+    // But if we ever allow recurring habits that skip days, we keep this.
     if (
       habit.lastCompletedDate &&
       habit.lastCompletedDate !== today &&
@@ -155,8 +205,19 @@ export const processHabitsOnLoad = (habits) => {
     ) {
       return { ...habit, currentStreak: 0 };
     }
+
     return habit;
   });
+};
+
+export const deactivateHabits = async (userId, habitIds) => {
+  if (!habitIds || habitIds.length === 0) return;
+  const { error } = await supabase
+    .from('habits')
+    .update({ is_active: false, current_streak: 0 })
+    .in('id', habitIds)
+    .eq('user_id', userId);
+  if (error) console.error('deactivateHabits:', error);
 };
 
 // ─── Analytics ───────────────────────────────────────────────────────────────

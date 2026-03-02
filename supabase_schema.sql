@@ -46,7 +46,8 @@ CREATE TABLE IF NOT EXISTS habits (
   current_streak       INTEGER DEFAULT 0,
   last_completed_date  DATE,
   created_at           TIMESTAMPTZ DEFAULT NOW(),
-  updated_at           TIMESTAMPTZ DEFAULT NOW()
+  updated_at           TIMESTAMPTZ DEFAULT NOW(),
+  is_active            BOOLEAN DEFAULT TRUE
 );
 
 CREATE TRIGGER habits_updated_at
